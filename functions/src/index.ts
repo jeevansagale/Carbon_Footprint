@@ -207,6 +207,10 @@ export const onAssessmentDeleted = onDocumentDeleted(
       ? data.emissions.totalKgCO2PerYear
       : (typeof data.totalEmission === "number" ? data.totalEmission : 0);
 
+    const annualEstimate = typeof data.emissions?.totalTonnesCO2PerYear === "number"
+      ? data.emissions.totalTonnesCO2PerYear
+      : (typeof data.annualEstimate === "number" ? data.annualEstimate : parseFloat((totalKgCO2 / 1000).toFixed(2)));
+
 
     const transportEmission = data.emissions?.breakdown?.transport ?? (data.transportEmission || 0);
     const energyEmission    = data.emissions?.breakdown?.energy    ?? (data.energyEmission || 0);
