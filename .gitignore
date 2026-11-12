@@ -92,3 +92,7 @@ no-ai-slop/
 skills-lock.json
 ALWAYES_READ.md
 Agent.md
+# Never commit nested environment files
+**/.env
+**/.env.*
+!**/.env.example
