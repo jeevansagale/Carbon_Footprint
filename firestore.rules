@@ -121,7 +121,9 @@ service cloud.firestore {
     
     match /communityLeaderboard/{docId} {
       allow read: if true;
-      allow write: if isSelf(docId) || isModerator();
+      // Leaderboard scores and profile fields are maintained by trusted Cloud Functions.
+      // Firebase Admin SDK writes bypass client security rules.
+      allow write: if false;
     }
 
     match /communityReports/{docId} {
