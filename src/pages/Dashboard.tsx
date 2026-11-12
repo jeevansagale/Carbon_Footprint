@@ -61,15 +61,26 @@ export default function Dashboard() {
         if (docs.length > 0) {
           if (!contextResult) {
             const latest = docs[0];
+            const latestBreakdown = latest.emissions?.breakdown ?? { transport: 0, energy: 0, food: 0, waste: 0, shopping: 0 };
+            const breakdownTotal = Object.values(latestBreakdown).reduce(
+              (sum: number, value: unknown) => sum + (typeof value === "number" && Number.isFinite(value) ? value : 0),
+              0
+            );
+            const fallbackPercentages = Object.fromEntries(
+              Object.entries(latestBreakdown).map(([key, value]) => [
+                key,
+                breakdownTotal > 0 && typeof value === "number" ? (value / breakdownTotal) * 100 : 0,
+              ])
+            );
             setActiveResult({
               totalKgCO2PerYear:    latest.emissions?.totalKgCO2PerYear    ?? 0,
               totalTonnesCO2PerYear: latest.emissions?.totalTonnesCO2PerYear ?? 0,
-              breakdown:  latest.emissions?.breakdown  ?? { transport: 0, energy: 0, food: 0, waste: 0, shopping: 0 },
-              percentages: latest.emissions?.percentages ?? { transport: 20, energy: 40, food: 20, waste: 10, shopping: 10 },
-              confidence: latest.confidence ?? { overallScore: 85, overallRating: 'HIGH' },
+              breakdown: latestBreakdown,
+              percentages: latest.emissions?.percentages ?? fallbackPercentages,
+              confidence: latest.confidence ?? { overallScore: 0, overallRating: 'ESTIMATE' },
               metadata: {
-                gridFactorUsed: 0.716,
-                state: latest.location?.state || 'India',
+                gridFactorUsed: latest.metadata?.gridFactorUsed ?? 0,
+                state: latest.location?.state || 'Unknown',
                 calculatorVersion: '2.0.0',
                 datasetVersion:    '2026.1',
               },
@@ -120,8 +131,8 @@ export default function Dashboard() {
 
   // Canonical EcoScore — one formula, one place
   const ecoScore        = calculateEcoScore(totalTonnes).score;
-  const confidenceScore = activeResult.confidence?.overallScore  ?? 85;
-  const confidenceRating = activeResult.confidence?.overallRating ?? 'HIGH';
+  const confidenceScore = activeResult.confidence?.overallScore ?? 0;
+  const confidenceRating = activeResult.confidence?.overallRating ?? 'ESTIMATE';
 
   const vsIndiaPct      = Math.round(((totalKg - INDIA_AVG_KG) / INDIA_AVG_KG) * 100);
   const isLowerThanIndia = totalKg <= INDIA_AVG_KG;
