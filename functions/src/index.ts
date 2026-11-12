@@ -107,6 +107,14 @@ export const onAssessmentCreated = onDocumentCreated(
 
     try {
       await db.runTransaction(async (transaction) => {
+        // Firestore event delivery can be retried. Use the aggregate report document
+        // as an idempotency marker, and ensure a create event is not applied after
+        // the source assessment has already been deleted.
+        const assessmentRef = db.collection("users").doc(userId).collection("assessments").doc(assessmentId);
+        const assessmentSnap = await transaction.get(assessmentRef);
+        const existingReport = await transaction.get(reportRef);
+        if (!assessmentSnap.exists || existingReport.exists) return;
+
         const statsSnap = await transaction.get(statsRef);
         const existingLeader = await transaction.get(leaderboardRef);
 
@@ -199,9 +207,6 @@ export const onAssessmentDeleted = onDocumentDeleted(
       ? data.emissions.totalKgCO2PerYear
       : (typeof data.totalEmission === "number" ? data.totalEmission : 0);
 
-    const annualEstimate = typeof data.emissions?.totalTonnesCO2PerYear === "number"
-      ? data.emissions.totalTonnesCO2PerYear
-      : (typeof data.annualEstimate === "number" ? data.annualEstimate : parseFloat((totalKgCO2 / 1000).toFixed(2)));
 
     const transportEmission = data.emissions?.breakdown?.transport ?? (data.transportEmission || 0);
     const energyEmission    = data.emissions?.breakdown?.energy    ?? (data.energyEmission || 0);
@@ -218,8 +223,15 @@ export const onAssessmentDeleted = onDocumentDeleted(
 
     try {
       await db.runTransaction(async (transaction) => {
+        // Only subtract an assessment that was previously included. Deleting
+        // this report marker also makes retries idempotent.
+        const existingReport = await transaction.get(reportRef);
+        if (!existingReport.exists) return;
         const statsSnap = await transaction.get(statsRef);
-        if (!statsSnap.exists) return;
+        if (!statsSnap.exists) {
+          transaction.delete(reportRef);
+          return;
+        }
 
         const prev = statsSnap.data()!;
         const prevReports = prev.totalReports || 1;
