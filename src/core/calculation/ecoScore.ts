@@ -37,7 +37,7 @@ const BENCHMARKS = {
  */
 export function calculateEcoScore(annualTonnesCO2: number): EcoScoreResult {
   // Clamp to non-negative
-  const tonnes = Math.max(0, annualTonnesCO2);
+  const tonnes = Number.isFinite(annualTonnesCO2) ? Math.max(0, annualTonnesCO2) : BENCHMARKS.poor;
 
   let score: number;
   if (tonnes <= BENCHMARKS.excellent) {
