@@ -22,21 +22,21 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
       borderColor: 'border-emerald-200',
       textColor: 'text-emerald-700',
       icon: ShieldCheck,
-      label: 'High Accuracy'
+      label: 'High Input Coverage'
     },
     MEDIUM: {
       bgColor: 'bg-amber-50',
       borderColor: 'border-amber-200',
       textColor: 'text-amber-700',
       icon: AlertTriangle,
-      label: 'Moderate Accuracy'
+      label: 'Moderate Input Coverage'
     },
     ESTIMATE: {
       bgColor: 'bg-sky-50',
       borderColor: 'border-sky-200',
       textColor: 'text-sky-700',
       icon: Info,
-      label: 'Estimated'
+      label: 'Estimated Inputs'
     }
   };
 
@@ -58,7 +58,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border font-medium ${c.bgColor} ${c.borderColor} ${c.textColor} ${sizeClasses[size]}`}
-      title={`${label || c.label}: ${score}% confidence`}
+      title={`${label || c.label}: ${score}% input coverage (heuristic)`}
     >
       <Icon className={iconSize[size]} />
       {label && <span>{label}</span>}
@@ -96,8 +96,8 @@ export const ConfidenceBreakdownCard: React.FC<ConfidenceBreakdownCardProps> = (
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-text-primary">Calculation Confidence</h3>
-            <p className="text-xs text-dark-500">Higher confidence = more specific data provided.</p>
+            <h3 className="text-lg font-semibold text-text-primary">Input Coverage</h3>
+            <p className="text-xs text-dark-500">Heuristic indicator of how specific the answers provided are; not statistical accuracy.</p>
           </div>
         </div>
         <ConfidenceBadge score={confidence.overallScore} rating={confidence.overallRating} label="Overall" size="md" />
