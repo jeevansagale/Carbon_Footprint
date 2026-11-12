@@ -27,7 +27,7 @@ function privacySafeName(name: string | undefined | null): string {
 }
 
 function calculateCloudEcoScore(annualTonnesCO2: number): number {
-  const tonnes = Math.max(0, annualTonnesCO2);
+  const tonnes = Number.isFinite(annualTonnesCO2) ? Math.max(0, annualTonnesCO2) : benchmarks.poor;
   const benchmarks = {
     excellent: 1.0,
     good: 1.5,
@@ -40,14 +40,14 @@ function calculateCloudEcoScore(annualTonnesCO2: number): number {
   if (tonnes <= benchmarks.excellent) {
     score = Math.round(90 + (1 - tonnes / benchmarks.excellent) * 10);
   } else if (tonnes <= benchmarks.good) {
-    const progress = (benchmarks.excellent - tonnes) / (benchmarks.excellent - benchmarks.good);
-    score = Math.round(75 + progress * 14);
+    const progress = (tonnes - benchmarks.excellent) / (benchmarks.good - benchmarks.excellent);
+    score = Math.round(90 - progress * 15);
   } else if (tonnes <= benchmarks.average) {
-    const progress = (benchmarks.good - tonnes) / (benchmarks.good - benchmarks.average);
-    score = Math.round(55 + progress * 19);
+    const progress = (tonnes - benchmarks.good) / (benchmarks.average - benchmarks.good);
+    score = Math.round(75 - progress * 20);
   } else if (tonnes <= benchmarks.belowAverage) {
-    const progress = (benchmarks.average - tonnes) / (benchmarks.average - benchmarks.belowAverage);
-    score = Math.round(30 + progress * 24);
+    const progress = (tonnes - benchmarks.average) / (benchmarks.belowAverage - benchmarks.average);
+    score = Math.round(55 - progress * 25);
   } else {
     score = Math.max(0, Math.round(30 * Math.exp(-(tonnes - benchmarks.belowAverage) / 3)));
   }
