@@ -99,10 +99,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           icon={<Globe className="w-4 h-4" />}
         />
         <KPIWidget
-          label="Confidence"
+          label="Input Coverage"
           value={`${confidenceScore}%`}
           unit={confidenceRating}
-          comparison="CEA grid factor: 0.716 kg/kWh"
+          comparison="Heuristic based on answer detail; not statistical accuracy"
           status={confidenceScore >= 80 ? 'good' : 'warning'}
           icon={<Activity className="w-4 h-4" />}
         />
@@ -129,7 +129,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="flex gap-8">
               <GaugeWidget
                 value={confidenceScore}
-                label="Confidence"
+                label="Input Coverage"
                 size={100}
                 color={semantic.info}
               />
