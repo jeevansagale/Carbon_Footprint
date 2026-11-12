@@ -56,70 +56,101 @@ export interface NormalizedAssessmentDocument {
 export function normalizeAssessmentDocument(doc: any, docId?: string): NormalizedAssessmentDocument {
   const safeId = docId || doc?.id || `legacy_${Date.now()}`;
   const safeUserId = doc?.userId || doc?.uid || 'anonymous';
-  const safeTimestamp = doc?.timestamp || doc?.createdAt || new Date().toISOString();
+  const safeTimestamp = doc?.timestamp || doc?.createdAt || '';
 
-  // Extract emissions
-  const rawTotalKg = doc?.emissions?.totalKgCO2PerYear || doc?.totalEmissions || doc?.emissions?.total || 3000;
-  const rawTotalTonnes = doc?.emissions?.totalTonnesCO2PerYear || Math.round((rawTotalKg / 1000) * 100) / 100;
-
-  const rawBreakdown = doc?.emissions?.breakdown || doc?.breakdown || {
-    transport: rawTotalKg * 0.35,
-    energy: rawTotalKg * 0.35,
-    food: rawTotalKg * 0.15,
-    waste: rawTotalKg * 0.08,
-    shopping: rawTotalKg * 0.07
+  // Only preserve values actually present in the stored document.
+  // Missing legacy fields must not be replaced with invented footprint estimates.
+  const firstFiniteNonNegative = (...values: unknown[]): number | undefined => {
+    for (const value of values) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.max(0, value);
+      }
+    }
+    return undefined;
   };
 
+  const rawTotalKg = firstFiniteNonNegative(
+    doc?.emissions?.totalKgCO2PerYear,
+    doc?.totalEmissions,
+    doc?.emissions?.total
+  ) ?? 0;
+  const rawTotalTonnes = firstFiniteNonNegative(
+    doc?.emissions?.totalTonnesCO2PerYear,
+    doc?.annualEstimate
+  ) ?? Math.round((rawTotalKg / 1000) * 100) / 100;
+
+  const rawBreakdown = doc?.emissions?.breakdown ?? doc?.breakdown ?? {};
   const safeBreakdown = {
-    transport: Math.round(rawBreakdown.transport || 0),
-    energy: Math.round(rawBreakdown.energy || 0),
-    food: Math.round(rawBreakdown.food || 0),
-    waste: Math.round(rawBreakdown.waste || 0),
-    shopping: Math.round(rawBreakdown.shopping || 0)
+    transport: firstFiniteNonNegative(rawBreakdown.transport) ?? 0,
+    energy: firstFiniteNonNegative(rawBreakdown.energy) ?? 0,
+    food: firstFiniteNonNegative(rawBreakdown.food) ?? 0,
+    waste: firstFiniteNonNegative(rawBreakdown.waste) ?? 0,
+    shopping: firstFiniteNonNegative(rawBreakdown.shopping) ?? 0,
+  };
+  const breakdownTotal = Object.values(safeBreakdown).reduce((sum, value) => sum + value, 0);
+
+  const storedPercentages = doc?.emissions?.percentages ?? doc?.percentages;
+  const derivedPercentages = {
+    transport: breakdownTotal > 0 ? (safeBreakdown.transport / breakdownTotal) * 100 : 0,
+    energy: breakdownTotal > 0 ? (safeBreakdown.energy / breakdownTotal) * 100 : 0,
+    food: breakdownTotal > 0 ? (safeBreakdown.food / breakdownTotal) * 100 : 0,
+    waste: breakdownTotal > 0 ? (safeBreakdown.waste / breakdownTotal) * 100 : 0,
+    shopping: breakdownTotal > 0 ? (safeBreakdown.shopping / breakdownTotal) * 100 : 0,
+  };
+  const safePercentages = {
+    transport: firstFiniteNonNegative(storedPercentages?.transport) ?? derivedPercentages.transport,
+    energy: firstFiniteNonNegative(storedPercentages?.energy) ?? derivedPercentages.energy,
+    food: firstFiniteNonNegative(storedPercentages?.food) ?? derivedPercentages.food,
+    waste: firstFiniteNonNegative(storedPercentages?.waste) ?? derivedPercentages.waste,
+    shopping: firstFiniteNonNegative(storedPercentages?.shopping) ?? derivedPercentages.shopping,
   };
 
-  // Safe Location
+  // Missing input-coverage metadata is unknown, not a fabricated 75% score.
+  const storedConfidence = firstFiniteNonNegative(
+    doc?.confidence?.overallScore,
+    doc?.confidence?.score
+  );
+  const safeConfidence = {
+    overallScore: Math.min(100, storedConfidence ?? 0),
+    overallRating: (['HIGH', 'MEDIUM', 'ESTIMATE'].includes(doc?.confidence?.overallRating)
+      ? doc.confidence.overallRating
+      : storedConfidence !== undefined && storedConfidence >= 85 ? 'HIGH'
+      : storedConfidence !== undefined && storedConfidence >= 70 ? 'MEDIUM'
+      : 'ESTIMATE') as 'HIGH' | 'MEDIUM' | 'ESTIMATE',
+    rationales: Array.isArray(doc?.confidence?.rationales)
+      ? doc.confidence.rationales
+      : ['Input-coverage metadata was not stored for this legacy assessment.'],
+  };
+
+  // Location details remain unknown when the original assessment did not store them.
   const safeLocation = {
-    country: 'India',
-    state: doc?.location?.state || doc?.state || 'Delhi',
+    country: doc?.location?.country || 'India',
+    state: doc?.location?.state || doc?.state || 'Unknown',
     district: doc?.location?.district || doc?.district,
     city: doc?.location?.city || doc?.city,
-    dwelling: doc?.location?.dwelling || doc?.dwelling || 'Apartment'
-  };
-
-  // Safe Confidence
-  const safeConfidence = {
-    overallScore: doc?.confidence?.overallScore || doc?.confidence?.score || 75,
-    overallRating: doc?.confidence?.overallRating || (doc?.confidence?.overallScore >= 85 ? 'HIGH' : 'MEDIUM') as any,
-    rationales: doc?.confidence?.rationales || ['Legacy calculation imported with standard defaults']
+    dwelling: doc?.location?.dwelling || doc?.dwelling,
   };
 
   return {
     id: safeId,
     userId: safeUserId,
     timestamp: safeTimestamp,
-    calculatorVersion: doc?.calculatorVersion || '1.0.0-legacy',
-    datasetVersion: doc?.datasetVersion || 'legacy-v1',
-    aiPromptVersion: doc?.aiPromptVersion || '1.0',
-    aiModel: doc?.aiModel || 'gemini-3.6-flash',
+    calculatorVersion: doc?.calculatorVersion || 'unknown',
+    datasetVersion: doc?.datasetVersion || 'unknown',
+    aiPromptVersion: doc?.aiPromptVersion || 'unknown',
+    aiModel: doc?.aiModel || 'unknown',
     mode: doc?.mode || 'quick',
     location: safeLocation,
     emissions: {
       totalKgCO2PerYear: Math.round(rawTotalKg * 10) / 10,
       totalTonnesCO2PerYear: rawTotalTonnes,
       breakdown: safeBreakdown,
-      percentages: doc?.emissions?.percentages || {
-        energy: Math.round((safeBreakdown.energy / rawTotalKg) * 100) || 35,
-        transport: Math.round((safeBreakdown.transport / rawTotalKg) * 100) || 35,
-        food: Math.round((safeBreakdown.food / rawTotalKg) * 100) || 15,
-        waste: Math.round((safeBreakdown.waste / rawTotalKg) * 100) || 8,
-        shopping: Math.round((safeBreakdown.shopping / rawTotalKg) * 100) || 7
-      }
+      percentages: safePercentages,
     },
     confidence: safeConfidence,
     answers: doc?.answers || doc?.inputs || {},
     aiAdvice: Array.isArray(doc?.aiAdvice) ? doc.aiAdvice : Array.isArray(doc?.recommendations) ? doc.recommendations : [],
-    status: doc?.status || 'approved',
+    status: doc?.status || 'pending_review',
     isTestAccount: Boolean(doc?.isTestAccount)
   };
 }
