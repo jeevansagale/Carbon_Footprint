@@ -94,8 +94,37 @@ describe('EcoTrack AI — Scientific Calculation Engine (v2.0)', () => {
     expect(normalized.userId).toBe('user_456');
     expect(normalized.emissions.totalKgCO2PerYear).toBe(2800);
     expect(normalized.location.country).toBe('India');
-    expect(normalized.confidence.overallScore).toBe(75);
+    expect(normalized.confidence.overallScore).toBe(0);
+    expect(normalized.confidence.overallRating).toBe('ESTIMATE');
+    expect(normalized.emissions.breakdown.transport).toBe(0);
+    expect(normalized.location.state).toBe('Gujarat');
     expect(normalized.calculatorVersion).toBe('1.0.0-legacy');
   });
 
+  it('does not fabricate emissions or location fields when a legacy document omits them', () => {
+    const normalized = normalizeAssessmentDocument({ id: 'missing_fields', userId: 'user_1' });
+    expect(normalized.emissions.totalKgCO2PerYear).toBe(0);
+    expect(normalized.emissions.totalTonnesCO2PerYear).toBe(0);
+    expect(normalized.emissions.breakdown).toEqual({ transport: 0, energy: 0, food: 0, waste: 0, shopping: 0 });
+    expect(normalized.emissions.percentages).toEqual({ transport: 0, energy: 0, food: 0, waste: 0, shopping: 0 });
+    expect(normalized.confidence.overallScore).toBe(0);
+    expect(normalized.confidence.overallRating).toBe('ESTIMATE');
+    expect(normalized.location.state).toBe('Unknown');
+    expect(normalized.location.dwelling).toBeUndefined();
+    expect(normalized.aiModel).toBe('unknown');
+    expect(normalized.status).toBe('pending_review');
+  });
+
+  it('preserves explicit zero emissions instead of replacing them with legacy fallbacks', () => {
+    const normalized = normalizeAssessmentDocument({
+      emissions: {
+        totalKgCO2PerYear: 0,
+        totalTonnesCO2PerYear: 0,
+        breakdown: { transport: 0, energy: 0, food: 0, waste: 0, shopping: 0 },
+      },
+    });
+    expect(normalized.emissions.totalKgCO2PerYear).toBe(0);
+    expect(normalized.emissions.totalTonnesCO2PerYear).toBe(0);
+    expect(Object.values(normalized.emissions.percentages).every(value => value === 0)).toBe(true);
+  });
 });
