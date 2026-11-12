@@ -1,6 +1,6 @@
 /**
  * Eco Score Calculator
- * Computes a 0-100 eco score and letter grade based on annual CO2 emissions.
+ * Computes a 0-100 heuristic eco score and letter grade based on annual CO2 emissions.
  * Uses Indian per-capita emission benchmarks.
  *
  * Sources:
@@ -14,7 +14,7 @@ import type { EcoScoreResult } from '../../types/assessment';
 
 /**
  * India-specific per-capita CO2 benchmarks (tonnes/year).
- * Used to compute eco score percentiles.
+ * Used as configured scoring thresholds; these are not empirical population percentiles.
  */
 const BENCHMARKS = {
   /** Excellent: below 1.0 tonne (top ~10% of Indian population) */
@@ -41,22 +41,22 @@ export function calculateEcoScore(annualTonnesCO2: number): EcoScoreResult {
 
   let score: number;
   if (tonnes <= BENCHMARKS.excellent) {
-    // 90-100: Excellent
+    // Lower emissions receive higher scores in the excellent band.
     score = Math.round(90 + (1 - tonnes / BENCHMARKS.excellent) * 10);
   } else if (tonnes <= BENCHMARKS.good) {
-    // 75-89: Good
-    const progress = (BENCHMARKS.excellent - tonnes) / (BENCHMARKS.excellent - BENCHMARKS.good);
-    score = Math.round(75 + progress * 14);
+    // 90 at 1.0 tonnes, decreasing to 75 at 1.5 tonnes.
+    const progress = (tonnes - BENCHMARKS.excellent) / (BENCHMARKS.good - BENCHMARKS.excellent);
+    score = Math.round(90 - progress * 15);
   } else if (tonnes <= BENCHMARKS.average) {
-    // 55-74: Average
-    const progress = (BENCHMARKS.good - tonnes) / (BENCHMARKS.good - BENCHMARKS.average);
-    score = Math.round(55 + progress * 19);
+    // 75 at 1.5 tonnes, decreasing to 55 at 2.5 tonnes.
+    const progress = (tonnes - BENCHMARKS.good) / (BENCHMARKS.average - BENCHMARKS.good);
+    score = Math.round(75 - progress * 20);
   } else if (tonnes <= BENCHMARKS.belowAverage) {
-    // 30-54: Below average
-    const progress = (BENCHMARKS.average - tonnes) / (BENCHMARKS.average - BENCHMARKS.belowAverage);
-    score = Math.round(30 + progress * 24);
+    // 55 at 2.5 tonnes, decreasing to 30 at 4.0 tonnes.
+    const progress = (tonnes - BENCHMARKS.average) / (BENCHMARKS.belowAverage - BENCHMARKS.average);
+    score = Math.round(55 - progress * 25);
   } else {
-    // 0-29: Poor
+    // Exponential decay beyond the highest emissions threshold.
     score = Math.max(0, Math.round(30 * Math.exp(-(tonnes - BENCHMARKS.belowAverage) / 3)));
   }
 
@@ -73,7 +73,7 @@ export function calculateEcoScore(annualTonnesCO2: number): EcoScoreResult {
   else if (score >= 25) { grade = 'D'; label = 'Below Average'; }
   else { grade = 'F'; label = 'Needs Improvement'; }
 
-  // Approximate percentile (lower emission = higher percentile)
+  // Heuristic relative index only; this is not a measured population percentile.
   const percentile = Math.max(1, Math.min(99, Math.round(
     100 * Math.exp(-tonnes / 3.0)
   )));
